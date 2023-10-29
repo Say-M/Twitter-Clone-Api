@@ -1,4 +1,4 @@
-DROP FUNCTION register;
+DROP FUNCTION IF EXISTS register;
 CREATE OR REPLACE FUNCTION register(data JSONB)
 RETURNS VARCHAR AS $$
 DECLARE
@@ -60,31 +60,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 	
-DROP FUNCTION login;
+DROP FUNCTION IF EXISTS login;
 CREATE OR REPLACE FUNCTION login(data JSONB)
 RETURNS JSONB AS $$
 DECLARE
 	_user JSONB = NULL::JSONB;
 	_username VARCHAR = coalesce((data->>'username')::varchar, NULL);
-	_password VARCHAR = coalesce((data->>'password')::varchar, NULL);
 BEGIN
 	-- check if all required variables are available or not
-	IF _username IS NULL THEN
+	IF _username AND _email IS NULL THEN
 		RETURN JSON_BUILD_OBJECT(
 			'status', 'failed',
-			'username', 'required'
-		);
-	END IF;
-	IF _password IS NULL THEN
-		RETURN JSON_BUILD_OBJECT(
-			'status', 'failed',
-			'password', 'required'
+			CASE WHEN _username IS NULL THEN 'username' ELSE 'email' END, 'required'
 		);
 	END IF;
 	
 	SELECT username, email INTO _user
 	FROM users
-	WHERE username = _username AND password = _password;
+	WHERE username = _username OR email = _email;
 	
 	RETURN JSON_BUILD_OBJECT(
 		'status', CASE WHEN _user IS NULL THEN 'failed' ELSE 'success' END,
