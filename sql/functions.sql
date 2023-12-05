@@ -1,6 +1,6 @@
 DROP FUNCTION IF EXISTS register;
 CREATE OR REPLACE FUNCTION register(data JSONB)
-RETURNS VARCHAR AS $$
+RETURNS JSONB AS $$
 DECLARE
 	_user JSONB = NULL::JSONB;
 	_username VARCHAR = coalesce((data->>'username')::varchar, NULL);
