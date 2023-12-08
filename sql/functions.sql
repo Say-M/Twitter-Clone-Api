@@ -67,7 +67,7 @@ DECLARE
     _username VARCHAR = coalesce((data->>'username')::VARCHAR, NULL);
     _email VARCHAR = coalesce((data->>'email')::VARCHAR, NULL);
 BEGIN
-    IF _username IS NULL OR _email IS NULL THEN
+    IF _username IS NULL AND _email IS NULL THEN
         RETURN JSON_BUILD_OBJECT(
             'status', 'failed',
             CASE WHEN _username IS NULL THEN 'username' ELSE 'email' END, 'required'
