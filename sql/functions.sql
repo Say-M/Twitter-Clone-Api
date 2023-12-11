@@ -10,7 +10,6 @@ DECLARE
 	_password VARCHAR = coalesce((data->>'password')::varchar, NULL);
 	_bio VARCHAR = coalesce((data->>'bio')::varchar, NULL);
 BEGIN
-	-- check if all required variables are available or not
 	IF _username IS NULL THEN
 		RETURN JSON_BUILD_OBJECT(
 			'status', 'failed',
@@ -110,7 +109,6 @@ BEGIN
     _username := data->>'username';
     _email := data->>'email';
 
-    -- Check if the provided username or email is null
     IF _username IS NULL OR _email IS NULL THEN
         result := jsonb_build_object('status', 'failed', 'message', 'Both username and email are required');
         RETURN result;
@@ -120,7 +118,6 @@ BEGIN
     FROM users
     WHERE username = _username AND email = _email;
 
-    -- Check if the username and email combination exists in the users table
     IF _password IS NULL THEN
         result := jsonb_build_object('status', 'failed', 'message', 'Username and email combination not found');
         RETURN result;
@@ -128,5 +125,77 @@ BEGIN
 
     result := jsonb_build_object('status', 'success', 'password', _password);
     RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS tweetcreate;
+CREATE OR REPLACE FUNCTION tweetcreate(data JSONB)
+RETURNS JSONB AS $$
+DECLARE
+	_tweet JSONB = NULL::JSONB;
+	_id VARCHAR = COALESCE((data->>'id')::VARCHAR, NULL);
+	_content VARCHAR = COALESCE((data->>'content')::VARCHAR, NULL);
+BEGIN
+	IF _content IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'content', 'required'
+		);
+	END IF;
+	IF _id IS NULL THEN 
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'userid', 'required'
+		);
+	END IF;
+	INSERT INTO tweets ("userId", content) 
+	VALUES (_id, _content)
+	RETURNING JSON_BUILD_OBJECT(
+		'id', id,
+		'userId', "userId",
+		'content', content
+	)
+	INTO _tweet;
+
+	RETURN JSON_BUILD_OBJECT(
+		'status', CASE WHEN _tweet IS NULL THEN 'failed' ELSE 'success' END,
+		'tweet', _tweet
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS userProfile;
+CREATE OR REPLACE FUNCTION userProfile(userId VARCHAR)
+RETURNS JSONB AS $$
+DECLARE 
+	_userInfo JSONB = NULL::JSONB;
+	_userRecord RECORD;
+BEGIN
+	SELECT * INTO _userRecord FROM users WHERE users.id = userId::uuid;
+
+	IF _userRecord IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'message', 'User not found'
+		);
+	ELSE
+		_userInfo := to_jsonb(_userRecord);
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'success',
+			'user', _userInfo
+		);
+	END IF;
+END;
+$$ LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION all_tweets()
+RETURNS JSONB AS $$
+DECLARE 
+	_allTweets JSONB[] := ARRAY[]::JSONB[];
+	_tweetsRecord RECORD;
+BEGIN
+	FOR _tweetsRecord IN SELECT * FROM tweets LOOP
+		_allTweets := array_append(_allTweets, to_jsonb(_tweetsRecord));
+	END LOOP;
+	RETURN JSON_BUILD_OBJECT('tweets', _allTweets);
 END;
 $$ LANGUAGE plpgsql;
