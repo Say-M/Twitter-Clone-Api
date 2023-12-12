@@ -1,3 +1,4 @@
+-- ! Auth
 DROP FUNCTION IF EXISTS register;
 CREATE OR REPLACE FUNCTION register(data JSONB)
 RETURNS JSONB AS $$
@@ -128,8 +129,82 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP FUNCTION IF EXISTS tweetcreate;
-CREATE OR REPLACE FUNCTION tweetcreate(data JSONB)
+-- ! User
+DROP FUNCTION IF EXISTS get_users;
+CREATE OR REPLACE FUNCTION get_users(_page INT, _limit INT)
+RETURNS JSONB AS $$
+DECLARE
+	_users JSONB = ARRAY[]::JSONB[];
+BEGIN
+	_users = (
+		SELECT JSON_AGG(u) 
+		FROM (
+			SELECT id, username, firstName, lastName, email, bio
+			FROM users
+			ORDER BY "createdAt" DESC
+			LIMIT _limit
+			OFFSET (_page - 1) * _limit
+		) u
+	)::JSONB;
+
+	RETURN JSON_BUILD_OBJECT(
+		'status', 'success',
+		'users', _users
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+-- ! Single user data
+DROP FUNCTION IF EXISTS get_user;
+CREATE OR REPLACE FUNCTION get_user(_id VARCHAR)
+RETURNS JSON AS $$
+DECLARE
+	_user JSON = NULL::JSON;
+BEGIN
+	-- check if all required variables are available or not
+	IF _id IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'id', 'required'
+		);
+	END IF;
+	
+	_user = (
+		SELECT 
+		JSON_AGG(
+			JSON_BUILD_OBJECT(
+				'id', u.id,
+				'username', u.username,
+				'firstName', u.firstName,
+				'lastName', u.lastName, 
+				'email', u.email,
+				'bio', u.bio,
+				'tweets', (
+					SELECT 
+					JSON_AGG(
+						JSON_BUILD_OBJECT(
+							'id', t.id,
+							'content', t.content,
+							'createdAt', t."createdAt"
+						)
+					)
+					AS tweets FROM tweets t WHERE t."userId" = '147f799e-f6e6-41a3-bd66-40cd1cde75b4'::uuid
+				)
+			)
+		)
+		FROM users u
+		WHERE u.id = '147f799e-f6e6-41a3-bd66-40cd1cde75b4'::uuid
+	)::JSON -> 0;
+	
+	RETURN JSON_BUILD_OBJECT(
+		'status', CASE WHEN _user IS NULL THEN 'failed' ELSE 'success' END,
+		'user', _user
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS tweetCreate;
+CREATE OR REPLACE FUNCTION tweetCreate(data JSONB)
 RETURNS JSONB AS $$
 DECLARE
 	_tweet JSONB = NULL::JSONB;
@@ -187,7 +262,9 @@ BEGIN
 	END IF;
 END;
 $$ LANGUAGE plpgsql
-CREATE OR REPLACE FUNCTION all_tweets()
+
+DROP FUNCTION IF EXISTS getTweets;
+CREATE OR REPLACE FUNCTION getTweets()
 RETURNS JSONB AS $$
 DECLARE 
 	_allTweets JSONB[] := ARRAY[]::JSONB[];
