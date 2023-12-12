@@ -156,10 +156,13 @@ $$ LANGUAGE plpgsql;
 
 -- ! Single user data
 DROP FUNCTION IF EXISTS get_user;
-CREATE OR REPLACE FUNCTION get_user(_id VARCHAR)
-RETURNS JSON AS $$
+CREATE OR REPLACE FUNCTION get_user(_id VARCHAR, filter JSONB)
+RETURNS JSONB AS $$
 DECLARE
-	_user JSON = NULL::JSON;
+	_user JSONB = NULL::JSONB;
+	_tweets VARCHAR = COALESCE((filter->>'tweets')::VARCHAR, NULL);
+	_retweets VARCHAR = COALESCE((filter->>'retweets')::VARCHAR, NULL);
+	_comments VARCHAR = COALESCE((filter->>'comments')::VARCHAR, NULL);
 BEGIN
 	-- check if all required variables are available or not
 	IF _id IS NULL THEN
@@ -179,7 +182,7 @@ BEGIN
 				'lastName', u.lastName, 
 				'email', u.email,
 				'bio', u.bio,
-				'tweets', (
+				'tweets', CASE WHEN _tweets IS NOT NULL THEN (
 					SELECT 
 					JSON_AGG(
 						JSON_BUILD_OBJECT(
@@ -188,17 +191,101 @@ BEGIN
 							'createdAt', t."createdAt"
 						)
 					)
-					AS tweets FROM tweets t WHERE t."userId" = '147f799e-f6e6-41a3-bd66-40cd1cde75b4'::uuid
-				)
+					AS tweets FROM tweets t WHERE t."userId" = _id::uuid
+				) ELSE NULL
+				END,
+				'retweets', CASE WHEN _retweets IS NOT NULL THEN (
+					SELECT 
+					JSON_AGG(
+						JSON_BUILD_OBJECT(
+							'id', rt.id,
+							'content', t.content,
+							'createdAt', rt."createdAt"
+						)
+					)
+					AS retweets FROM retweets rt
+					INNER JOIN tweets t ON rt."tweetId" = t.id
+					WHERE rt."userId" = _id::uuid
+				) ELSE NULL
+				END,
+				'comments', CASE WHEN _comments IS NOT NULL THEN (
+					SELECT 
+					JSON_AGG(
+						JSON_BUILD_OBJECT(
+							'id', c.id,
+							'content', c.content,
+							'createdAt', c."createdAt"
+						)
+					)
+					AS comments FROM comments c WHERE c."userId" = _id::uuid
+				) ELSE NULL
+				END
 			)
 		)
 		FROM users u
-		WHERE u.id = '147f799e-f6e6-41a3-bd66-40cd1cde75b4'::uuid
-	)::JSON -> 0;
+		WHERE u.id = _id::uuid
+	)::JSONB -> 0;
 	
 	RETURN JSON_BUILD_OBJECT(
 		'status', CASE WHEN _user IS NULL THEN 'failed' ELSE 'success' END,
 		'user', _user
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+-- ! Specific user's followers
+DROP FUNCTION IF EXISTS get_user_followers;
+CREATE OR REPLACE FUNCTION get_user_followers(_id VARCHAR)
+RETURNS JSONB AS $$
+DECLARE
+	_follower JSONB = NULL::JSONB;
+BEGIN
+	-- check if all required variables are available or not
+	IF _id IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'id', 'required'
+		);
+	END IF;
+	
+	_follower = (
+		SELECT
+		JSON_AGG(
+			JSON_BUILD_OBJECT(
+				'id', u.id,
+				'username', u.username,
+				'firstName', u.firstName,
+				'lastName', u.lastName, 
+				'email', u.email,
+				'bio', u.bio,
+				'followers', (
+					SELECT
+					JSON_AGG(
+						JSON_BUILD_OBJECT(
+							'id', f.id,
+							'status', f.status,
+							'user', JSON_BUILD_OBJECT(
+								'id', u.id,
+								'firstName', u.firstName,
+								'lastName', u.lastName,
+								'email', u.email,
+								'username', u.username
+							)
+						)
+					)
+					FROM followers f
+					INNER JOIN users u ON f."receiverId" = u.id
+					WHERE "senderId" = _id::uuid
+				)
+			)
+		)
+		FROM users u
+		WHERE u.id = _id::uuid
+	)::JSONB -> 0;
+	
+	RETURN JSON_BUILD_OBJECT(
+		'status', CASE WHEN _follower IS NULL THEN 'failed' ELSE 'success' END,
+		'follower', _follower
 	);
 END;
 $$ LANGUAGE plpgsql;
