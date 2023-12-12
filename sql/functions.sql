@@ -235,7 +235,7 @@ $$ LANGUAGE plpgsql;
 
 -- ! Specific user's followers
 DROP FUNCTION IF EXISTS get_user_followers;
-CREATE OR REPLACE FUNCTION get_user_followers(_id VARCHAR, _status BOOLEAN[])
+CREATE OR REPLACE FUNCTION get_user_followers(_id VARCHAR, _status BOOLEAN[] DEFAULT ARRAY[TRUE, FALSE])
 RETURNS JSONB AS $$
 DECLARE
 	_follower JSONB = NULL::JSONB;
