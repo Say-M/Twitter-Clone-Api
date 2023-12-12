@@ -235,7 +235,7 @@ $$ LANGUAGE plpgsql;
 
 -- ! Specific user's followers
 DROP FUNCTION IF EXISTS get_user_followers;
-CREATE OR REPLACE FUNCTION get_user_followers(_id VARCHAR)
+CREATE OR REPLACE FUNCTION get_user_followers(_id VARCHAR, _status BOOLEAN[])
 RETURNS JSONB AS $$
 DECLARE
 	_follower JSONB = NULL::JSONB;
@@ -275,7 +275,7 @@ BEGIN
 					)
 					FROM followers f
 					INNER JOIN users u ON f."receiverId" = u.id
-					WHERE "senderId" = _id::uuid
+					WHERE "senderId" = _id::uuid AND f.status = ANY(_status)
 				)
 			)
 		)
@@ -289,6 +289,9 @@ BEGIN
 	);
 END;
 $$ LANGUAGE plpgsql;
+-- ! Example
+SELECT get_user_followers('147f799e-f6e6-41a3-bd66-40cd1cde75b4', ARRAY[TRUE,FALSE]);
+
 
 DROP FUNCTION IF EXISTS tweetCreate;
 CREATE OR REPLACE FUNCTION tweetCreate(data JSONB)
