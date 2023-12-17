@@ -10,12 +10,10 @@ router.post('/register', hashPassword, async (req, res) => {
     const data = req.body;
     const result = await client.query('SELECT register($1)', [data]);
     if (result?.rows[0]?.register?.status === 'failed') {
-      return res
-        .status(400)
-        .send({
-          error: result?.rows[0]?.register,
-          message: 'Something went wrong',
-        });
+      return res.status(400).send({
+        error: result?.rows[0]?.register,
+        message: 'Something went wrong',
+      });
     }
     res.status(201).send(result?.rows[0]?.register);
   } catch (error) {

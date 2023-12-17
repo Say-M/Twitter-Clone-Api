@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const router = Router();
 const client = require("../../db/client");
+
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -23,4 +24,5 @@ router.get("/:id", async (req, res) => {
     res.status(200).json({ msg: "user not found" });
   }
 });
+
 module.exports = router;
