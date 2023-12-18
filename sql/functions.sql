@@ -1,4 +1,4 @@
--- ! Auth
+-- ! register a user
 DROP FUNCTION IF EXISTS register;
 CREATE OR REPLACE FUNCTION register(data JSONB)
 RETURNS JSONB AS $$
@@ -60,6 +60,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 	
+-- ! Login
 CREATE OR REPLACE FUNCTION login(data JSONB)
 RETURNS JSONB AS $$
 DECLARE
@@ -97,7 +98,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+-- ! get user password
 DROP FUNCTION IF EXISTS get_password;  
 CREATE OR REPLACE FUNCTION get_password(data JSONB)
 RETURNS JSONB AS $$
@@ -292,7 +293,7 @@ $$ LANGUAGE plpgsql;
 -- ! Example
 SELECT get_user_followers('147f799e-f6e6-41a3-bd66-40cd1cde75b4', ARRAY[TRUE,FALSE]);
 
-
+-- ! create a tweet
 DROP FUNCTION IF EXISTS tweetCreate;
 CREATE OR REPLACE FUNCTION tweetCreate(data JSONB)
 RETURNS JSONB AS $$
@@ -329,6 +330,96 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ! get all tweets
+DROP FUNCTION IF EXISTS get_tweets;
+CREATE OR REPLACE FUNCTION get_tweets(_page INT, _limit INT)
+RETURNS JSONB AS $$
+DECLARE
+	_tweets JSONB = ARRAY[]::JSONB[];
+BEGIN
+	_tweets = (
+		WITH tweetLikes AS (
+			SELECT "tweetId", COUNT(*) AS likes
+			FROM likes
+			GROUP BY "tweetId"
+		),
+		tweetComments AS (
+			SELECT "tweetId", COUNT(*) AS comments
+			FROM comments
+			GROUP BY "tweetId"
+		)
+		SELECT JSON_AGG(
+			JSON_BUILD_OBJECT(
+				'id', t.id,
+				'content', t.content,
+				'likes', COALESCE(tl.likes, 0),
+				'comments', COALESCE(tc.comments, 0),
+				'user', JSON_BUILD_OBJECT(
+					'id', u.id,
+					'username', u.username,
+					'firstName', u.firstName,
+					'lastName', u.lastName,
+					'email', u.email,
+					'bio', u.bio
+				),
+				'createdAt', t."createdAt",
+				'updatedAt', t."updatedAt"
+			)
+			ORDER BY t."createdAt"
+		)
+		FROM tweets t
+		LEFT JOIN tweetLikes tl ON t.id = tl."tweetId"
+		LEFT JOIN tweetComments tc ON t.id = tc."tweetId"
+		LEFT JOIN users u ON t."userId" = u.id
+		LIMIT _limit
+		OFFSET (_page - 1) * _limit
+	)::JSONB;
+
+	RETURN JSON_BUILD_OBJECT(
+		'status', 'success',
+		'tweets', _tweets
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ! create retweet
+DROP FUNCTION IF EXISTS retweetCreate;
+CREATE OR REPLACE FUNCTION retweetCreate(data JSONB)
+RETURNS JSONB AS $$
+DECLARE
+	_retweet JSONB = NULL::JSONB;
+	_user_id VARCHAR = COALESCE((data->>'user_id')::VARCHAR, NULL);
+	_tweet_id VARCHAR = COALESCE((data->>'tweet_id')::VARCHAR, NULL);
+BEGIN
+	IF _user_id IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'user_id', 'required'
+		);
+	END IF;
+	IF _tweet_id IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'tweet_id', 'required'
+		);
+	END IF;
+	INSERT INTO retweets ("userId", "tweetId")
+	VALUES (_user_id, _tweet_id)
+	RETURNING JSON_BUILD_OBJECT(
+		'id', id,
+		'userId', "userId",
+		'tweetId', "tweetId"
+	)
+	INTO _retweet;
+
+	RETURN JSON_BUILD_OBJECT(
+		'status', CASE WHEN _retweet IS NULL THEN 'failed' ELSE 'success' END,
+		'retweet', _retweet
+	);
+END;
+$$ LANGUAGE plpgsql;
+
 DROP FUNCTION IF EXISTS userProfile;
 CREATE OR REPLACE FUNCTION userProfile(userId VARCHAR)
 RETURNS JSONB AS $$
@@ -353,6 +444,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql
 
+-- ! get all tweets
 DROP FUNCTION IF EXISTS getTweets;
 CREATE OR REPLACE FUNCTION getTweets()
 RETURNS JSONB AS $$
