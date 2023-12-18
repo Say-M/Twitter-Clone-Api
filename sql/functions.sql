@@ -298,7 +298,7 @@ CREATE OR REPLACE FUNCTION tweetCreate(data JSONB)
 RETURNS JSONB AS $$
 DECLARE
 	_tweet JSONB = NULL::JSONB;
-	_id VARCHAR = COALESCE((data->>'id')::VARCHAR, NULL);
+	_user_id VARCHAR = COALESCE((data->>'user_id')::VARCHAR, NULL);
 	_content VARCHAR = COALESCE((data->>'content')::VARCHAR, NULL);
 BEGIN
 	IF _content IS NULL THEN
@@ -307,14 +307,14 @@ BEGIN
 			'content', 'required'
 		);
 	END IF;
-	IF _id IS NULL THEN 
+	IF _user_id IS NULL THEN 
 		RETURN JSON_BUILD_OBJECT(
 			'status', 'failed',
-			'userid', 'required'
+			'user_id', 'required'
 		);
 	END IF;
 	INSERT INTO tweets ("userId", content) 
-	VALUES (_id, _content)
+	VALUES (_user_id, _content)
 	RETURNING JSON_BUILD_OBJECT(
 		'id', id,
 		'userId', "userId",
