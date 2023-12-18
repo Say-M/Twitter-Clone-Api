@@ -3,11 +3,11 @@ const { validateToken } = require("../utils/token");
 
 const tokenVerification = async (req, res, next) => {
   try {
-    const token = req.headers.cookie.split("=s%3A")[1].split(".1")[0];
+    const token = req.headers.cookie.split("=")[1];
     // console.log(token);
     const decoded = validateToken(token);
     if (!decoded) return res.status(401).send({ message: "Unauthorized" });
-
+    console.log("OK");
     const result = await client.query("SELECT userProfile($1)", [decoded.id]);
     // console.log(result);
     if (result?.rows[0]?.userprofile?.status === "failed") {

@@ -10,13 +10,7 @@ const validateToken = (token) => {
 
 const attachCookiesToResponse = ({ res, token }) => {
   console.log(token);
-  const oneDay = 1000 * 60 * 60 * 24;
-  res.cookie("accessToken", token, {
-    httpOnly: true,
-    expires: new Date(Date.now() + oneDay),
-    secure: process.env.NODE_ENV === "production",
-    signed: true,
-  });
+  res.cookie("accessToken", token);
 };
 
 module.exports = { generateToken, validateToken, attachCookiesToResponse };
