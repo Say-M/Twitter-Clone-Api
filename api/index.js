@@ -1,9 +1,11 @@
-const { Router } = require("express");
+const { Router } = require('express');
 const router = Router();
-const authRouters = require("./auth/index");
-const tweetRouters = require("./actions/index");
-const userRouters = require("./users/index");
-router.use("", authRouters);
-router.use("", tweetRouters);
-router.use("", userRouters);
+const authRouters = require('./auth/index');
+const tweetRouters = require('./tweets/index');
+const retweetRouters = require('./retweets');
+const userRouters = require('./users/index');
+router.use('', authRouters);
+router.use('', tweetRouters);
+router.use('', retweetRouters);
+router.use('', userRouters);
 module.exports = router;

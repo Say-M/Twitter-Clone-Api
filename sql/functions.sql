@@ -299,7 +299,7 @@ CREATE OR REPLACE FUNCTION tweetCreate(data JSONB)
 RETURNS JSONB AS $$
 DECLARE
 	_tweet JSONB = NULL::JSONB;
-	_user_id VARCHAR = COALESCE((data->>'user_id')::VARCHAR, NULL);
+	_user_id UUID = COALESCE((data->>'user_id')::UUID, NULL);
 	_content VARCHAR = COALESCE((data->>'content')::VARCHAR, NULL);
 BEGIN
 	IF _content IS NULL THEN
@@ -328,6 +328,45 @@ BEGIN
 		'tweet', _tweet
 	);
 END;
+$$ LANGUAGE plpgsql;
+
+-- ! update a tweet
+DROP FUNCTION IF EXISTS tweet_update;
+CREATE OR REPLACE FUNCTION tweet_update(_id UUID, data JSONB)
+RETURNS JSONB AS $$
+DECLARE
+	_tweet JSONB = NULL::JSONB;
+	_content VARCHAR = COALESCE((data->>'content')::VARCHAR, NULL);
+BEGIN
+	IF _content IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'content', 'required'
+		);
+	END IF;
+	IF _id IS NULL THEN 
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'id', 'required'
+		);
+	END IF;
+	UPDATE tweets
+	SET
+		content = COALESCE(_content, content)
+	WHERE id = _id
+	RETURNING JSON_BUILD_OBJECT(
+		'id', id,
+		'userId', "userId",
+		'content', content
+	)
+	INTO _tweet;
+
+	RETURN JSON_BUILD_OBJECT(
+		'status', CASE WHEN _tweet IS NULL THEN 'failed' ELSE 'success' END,
+		'tweet', _tweet
+	);
+END;
+$$ LANGUAGE plpgsql;
 
 -- ! create retweet
 DROP FUNCTION IF EXISTS retweetCreate;
@@ -365,6 +404,34 @@ BEGIN
 	);
 END;
 $$ LANGUAGE plpgsql;
+
+-- ! delete a retweet
+DROP FUNCTION IF EXISTS retweet_delete;
+CREATE OR REPLACE FUNCTION retweet_delete(_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+	_retweet JSONB = NULL::JSONB;
+BEGIN
+	IF _id IS NULL THEN
+		RETURN JSON_BUILD_OBJECT(
+			'status', 'failed',
+			'id', 'required'
+		);
+	END IF;
+	DELETE FROM retweets
+	WHERE id = _id
+	RETURNING JSON_BUILD_OBJECT(
+		'id', id,
+		'userId', "userId",
+		'tweetId', "tweetId"
+	)
+	INTO _retweet;
+
+	RETURN JSON_BUILD_OBJECT(
+		'status', CASE WHEN _retweet IS NULL THEN 'failed' ELSE 'success' END,
+		'retweet', _retweet
+	);
+END;
 $$ LANGUAGE plpgsql;
 
 -- ! get all tweets

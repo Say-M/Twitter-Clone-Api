@@ -5,7 +5,6 @@ const { validateToken } = require('../utils/token');
 const tokenVerification = async (req, res, next) => {
   try {
     const token = req.headers.authorization.split(' ')[1];
-    // console.log(token);
     const decoded = validateToken(token);
     if (!decoded) return res.status(401).send({ message: 'Unauthorized' });
 
@@ -18,7 +17,7 @@ const tokenVerification = async (req, res, next) => {
       });
     }
     // console.log(result?.rows[0]?.userprofile?.user?.id);
-    req.body.id = result?.rows[0]?.userprofile?.user?.id;
+    res.user = result?.rows[0]?.userprofile?.user;
     next();
   } catch (error) {
     console.error(error);
